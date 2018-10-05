@@ -1,3 +1,5 @@
+const util = require('../../utils/util')
+
 Page({
     data:{
         status:'',
@@ -166,6 +168,7 @@ Page({
         wx.getBLEDeviceServices({
             deviceId:that.data.connectedDeviceId,
             success:function(res){
+              console.log(res)
                 that.setData({
                     services:res.services,
                     msg: "已连接" +that.data.connectedDeviceId,
@@ -177,52 +180,66 @@ Page({
     //获取特征值
     getDevicesCharacteristics:function(){
         let that=this;
+      console.log("通信点 ", that.data)
         for(let j=0;j<that.data.services.length;j++){
-            console.log(j);
+          let deviceId = that.data.connectedDeviceId;
+          let serviceId = that.data.services[j].uuid;
+          //查找180A服务
+          if (serviceId.indexOf("180A")==-1){
+            continue
+          }
+          let buffer = util.convert("CCCCFFFFCC33A5023333");
             wx.getBLEDeviceCharacteristics({
-                deviceId:that.data.connectedDeviceId,
-                serviceId:that.data.services[j].uuid,
+              deviceId: deviceId,
+              serviceId: serviceId,
                 success:function(res){
+                   // let that=this;
                     for(let i=0;i<res.characteristics.length;i++){
-                        if(res.characteristics[i].properties.notify){//判断特征值是否支持notify操作
-                            console.log(j," ", that.data.services[j].uuid);
-                            console.log("可通知的特征值UUID", res.characteristics[i].uuid);
-                            that.setData({
-                                notifyServicweId: that.data.services[j].uuid,
-                                notifyCharacteristicsId: res.characteristics[i].uuid,
-                            })
-                        }
+                      /**
                         if (res.characteristics[i].properties.write) {
-                            console.log(j," ", that.data.services[j].uuid);
-                            console.log("可写的特征值UUID", res.characteristics[i].uuid);
+                       **/
+                          var characteristicId = res.characteristics[i].uuid;
+                          if (characteristicId.indexOf("2A23")>0){
+                            console.log("通信点 ", serviceId, "---", characteristicId);
+                            /**
+                            wx.writeBLECharacteristicValue({
+                              deviceId: deviceId,
+                              serviceId: serviceId,
+                              characteristicId: characteristicId,
+                              value: buffer,
+                              success: function (res) {
+                                console.log('writeBLECharacteristicValue success', res.errMsg)
+                              }
+                            });
+                             * */
+                            wx.readBLECharacteristicValue({
+                              // 这里的 deviceId 需要已经通过 createBLEConnection 与对应设备建立链接  [**new**]
+                              deviceId: deviceId,
+                              // 这里的 serviceId 需要在上面的 getBLEDeviceServices 接口中获取
+                              serviceId: serviceId,
+                              // 这里的 characteristicId 需要在上面的 getBLEDeviceCharacteristics 接口中获取
+                              characteristicId: characteristicId,
+                              success: function (res) {
+                                console.log('蓝牙返回成功:readBLECharacteristicValue:', res);
+                                wx.onBLECharacteristicValueChange(function (res) {
+                                  console.log(`characteristic ${res.characteristicId} has changed, now is ${res.value}`)
+                                  console.log(util.ab2hex(res.value))
+                                });
+                              },
+                              fail: function (res) {
+                                console.log('蓝牙返回错误:readBLECharacteristicValue:', res);
+                              }
+                            })
+                          }
+                          /**
                             that.setData({
                               writeServicweId: that.data.services[j].uuid,
-                              writeCharacteristicsId: res.characteristics[i].uuid,
+                              writeCharacteristicsId: characteristicId,
                             })
-                
-                          } else if (res.characteristics[i].properties.read) {
-                            console.log(j, " ",that.data.services[j].uuid);
-                            console.log("可读的特征值UUID", res.characteristics[i].uuid);
-                            that.setData({
-                              readServicweId: that.data.services[j].uuid,
-                              readCharacteristicsId: res.characteristics[i].uuid,
-                            })
-                        }
-                        if(res.characteristics[i].properties.notify&&res.characteristics[i].properties.write&&res.characteristics[i].properties.read){
-                            //同时支持notify、write、read操作的特征值
-                            that.setData({
-                                characteristics:res.characteristics[i],
-                                notifyServicweId: that.data.services[j].uuid,
-                                notifyCharacteristicsId: res.characteristics[i].uuid,
-                                writeServicweId: that.data.services[j].uuid,
-                                writeCharacteristicsId: res.characteristics[i].uuid,
-                                readServicweId: that.data.services[j].uuid,
-                                readCharacteristicsId: res.characteristics[i].uuid
-                            })
-                        }
+
+                          }
+                          */
                     };
-                    console.log('All:', res.characteristics);
-                    console.log('AllSupported:', that.data.characteristics);
                 }
             })
         }
